@@ -1,23 +1,37 @@
-# CSV Sales Report Generator
+# Python Sales Report Automation
 
-CLI на Python 3.9+ для проверки CSV с продажами и создания сводного CSV-отчёта.
-Используется только стандартная библиотека; установка зависимостей не нужна.
+A Python command-line tool that validates sales data and generates a CSV report
+with individual sales, category summaries, and overall totals. Requires Python
+3.9+ and uses only the standard library—no dependencies to install.
 
-## Запуск
+## Features
 
-Из корня репозитория:
+- Validate sales records with clear errors that identify CSV lines.
+- Calculate revenue accurately with decimal arithmetic.
+- Summarize quantities and revenue by category and across all sales.
+- Protect existing files from overwriting and reduce spreadsheet formula risks.
+- Verified by **47 passing automated tests**.
 
-```bash
-python3 projects/csv-sales-report/sales_report.py projects/csv-sales-report/example_sales.csv --output projects/csv-sales-report/report.csv
+## Quick start
+
+Run from the root of this standalone repository:
+
+```sh
+python3 sales_report.py example_sales.csv --output report.csv
 ```
 
-Позиционный аргумент — путь к входному CSV. Опция `-o` / `--output` задаёт
-путь нового отчёта. Без неё отчёт создаётся рядом с входным файлом под именем
-`<имя_входного_файла>_report.csv`. Каталог назначения должен существовать.
-Существующие файлы не перезаписываются: при повторном запуске выберите новый путь.
-Справка: `python3 projects/csv-sales-report/sales_report.py --help`.
+The positional argument is the input CSV path. Use `-o` or `--output` to choose a
+new report path. Without it, the report is saved beside the input as
+`<input_stem>_report.csv`. The destination directory must already exist.
+**Existing files are never overwritten**; choose a new output path for each run.
 
-## Входные данные
+For all options:
+
+```sh
+python3 sales_report.py --help
+```
+
+## Input format
 
 ```csv
 date,product,category,quantity,unit_price
@@ -26,93 +40,121 @@ date,product,category,quantity,unit_price
 2026-09-02,Notebook,Office,5,4.50
 ```
 
-- Кодировка UTF-8 (допустим BOM), разделитель — запятая. Кавычки допустимы
-  только в начале поля; внутри заключённого в кавычки поля они удваиваются.
-  NUL-символы отклоняются с понятной ошибкой.
-  Поддерживаются многострочные поля и переводы строк LF, CRLF и CR.
-- Все пять колонок обязательны. Их порядок произвольный, дополнительные колонки
-  игнорируются, повторяющиеся имена колонок запрещены.
-- Все обязательные значения непустые. Пробелы по краям даты и чисел удаляются;
-  product/category сохраняются без изменений, кроме защиты от формул.
-- Дата — существующая календарная дата строго в формате `YYYY-MM-DD`.
-- Количество — целое неотрицательное число; цена — неотрицательное число
-  с точкой, например `0`, `12.50` или `0.001`. Знаки, экспоненциальная запись,
-  NaN и Infinity не допускаются. Возвраты через отрицательные значения не поддерживаются.
-- Пустой файл, файл только с заголовком и строки с неверным числом полей
-  считаются ошибками. Пустые физические строки пропускаются.
+| Column | Requirement |
+| --- | --- |
+| `date` | Valid calendar date in strict `YYYY-MM-DD` format |
+| `product` | Nonempty product name |
+| `category` | Nonempty category name; case-sensitive |
+| `quantity` | Nonnegative integer |
+| `unit_price` | Nonnegative decimal using a period, such as `0`, `12.50`, or `0.001` |
 
-## Отчёт
+All five columns are required, in any order. Extra columns are ignored; duplicate
+column names are rejected. Leading and trailing whitespace is removed from dates
+and numbers. Product and category text is preserved except for formula protection;
+whitespace-only values are rejected.
 
-Колонки: `type,date,product,category,quantity,unit_price,revenue`.
+Use comma-separated UTF-8 CSV (an optional BOM is accepted). Quoted fields may
+contain line breaks and escaped double quotes (`""`); opening quotes must appear
+at the start of a field. LF, CRLF, and CR line endings are supported. NUL
+characters, malformed quoting, and rows with the wrong number of fields are
+rejected. Empty files and header-only files are invalid; blank physical lines
+outside quoted fields are skipped.
 
-1. `sale`: исходные продажи в порядке входного файла, с выручкой каждой строки.
-2. `category`: количество единиц и выручка по категориям, отсортированным по имени.
-3. `total`: общее количество проданных единиц и общая выручка.
+Numbers cannot contain signs, exponential notation, NaN, or Infinity. Negative
+values, including returns represented as negative sales, are not supported.
 
-Не относящиеся к типу строки поля остаются пустыми. Для примера выше:
-Electronics — 5 единиц и 160.00; Office — 5 единиц и 22.50;
-общий итог — 10 единиц и 182.50. Строки разных типов нельзя суммировать вместе:
-итоги уже включают продажи.
+## Report output
 
-Денежные вычисления выполняются через Decimal с точностью, достаточной для
-операндов, без float и округления до копеек. Все продажи предполагаются
-в одной валюте. Имена категорий чувствительны к регистру.
+The output columns are:
 
-Ошибки выводятся в stderr с префиксом `Error:`; для неверных значений
-указывается строка CSV. Код завершения: 0 — успех, 1 — ошибка данных или файлов,
-2 — неверные аргументы CLI. Весь вход проверяется до создания отчёта.
-
-## Тестирование
-
-Из корня репозитория:
-
-```bash
-python3 -B -m unittest discover -s projects/csv-sales-report/tests -v
+```csv
+type,date,product,category,quantity,unit_price,revenue
 ```
 
-Тесты проверяют валидацию, точные денежные расчёты, категории, итоги и CLI.
-Временные файлы тестов создаются внутри этой директории и удаляются после тестов.
+| Row type | Contents | Order |
+| --- | --- | --- |
+| `sale` | Original sale with its calculated revenue | Input order |
+| `category` | Total quantity and revenue for one category | Sorted by category name |
+| `total` | Overall quantity and revenue | Last row |
 
-## Безопасное сохранение
+Fields that do not apply to a row type are left blank. For the sample above:
 
-Отчёт записывается во временный файл в каталоге назначения. После успешных
-записи, flush, fsync и закрытия готовый файл публикуется через `os.link`.
-Эта операция атомарно создаёт итоговое имя и отказывает, если оно уже занято,
-в том числе символической ссылкой. Проверка наличия с последующим rename
-не используется. Исходный CSV и существующий отчёт не перезаписываются.
-Временный файл удаляется в блоке finally как при успехе, так и при ошибке.
+| Category | Quantity | Revenue |
+| --- | --- | --- |
+| Electronics | 5 | 160.00 |
+| Office | 5 | 22.50 |
+| **Total** | **10** | **182.50** |
 
-Нужна файловая система с поддержкой жёстких ссылок; при отсутствии поддержки
-программа сообщает ошибку без небезопасного запасного способа публикации.
-Гарантия относится к обычным ошибкам выполнения, а не к отключению питания,
-принудительному завершению процесса или изменению прав/каталога другим процессом:
-они могут помешать удалению временного файла. Ошибка удаления не скрывается;
-если она произошла после публикации, готовый итоговый файл уже может существовать.
+Do not sum different row types together: category and overall totals already
+include the individual sales.
 
-## Защита от формул
+Calculations use `Decimal` with sufficient precision for the operands, avoiding
+floating-point errors and rounding to cents. All sales are assumed to use one
+currency; currency conversion, taxes, and monetary rounding are not implemented.
 
-В product/category перед опасным значением добавляется апостроф (`'`).
-Опасными считаются значения с первым значимым символом `=`, `+`, `-`, `@`:
-при проверке пропускаются начальные пробелы, управляющие и форматирующие
-Unicode-символы. Значения, начинающиеся с управляющего/форматирующего символа,
-также получают апостроф. Защита применяется и к строкам итогов по категориям.
-Обычный текст сохраняется, числовые колонки не получают апостроф и остаются
-числовыми значениями в CSV. Группировка выполняется по исходному имени категории.
+## Validation and errors
 
-CSV не хранит типы ячеек: поведение зависит от версии Excel/другого приложения
-и настроек импорта. Апостроф может быть видимым; его удаление или повторное
-сохранение/импорт может убрать защиту. Для недоверенных файлов импортируйте
-product/category явно как текст и не удаляйте защитный префикс. Универсальная
-гарантия для всех табличных программ и преобразований CSV не заявляется.
+The entire input is validated before a report is created. Errors are written to
+stderr with an `Error:` prefix; invalid values include the CSV line number.
 
-## Ограничения ресурсов
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Data or file error |
+| `2` | Invalid command-line arguments |
 
-Вход ограничен 10 МБ (10 000 000 байт, включая BOM и переводы строк) и
-100 000 записей данных без заголовка. Ровно граничные значения допустимы.
-Проверяются фактически прочитанные байты, а не только метаданные размера файла.
-Многострочное поле считается частью одной записи; пустые строки вне полей
-не считаются записями. Превышение любого лимита — ошибка без создания отчёта.
-Стандартный CSV-парсер также ограничивает размер отдельного поля
-(обычно 131 072 символа); превышение возвращается как ошибка CLI.
+## Security and reliable file handling
 
-Данные хранятся в памяти. Нет конвертации валют, налогов и округления денег.
+### Safe saving
+
+The report is written to a temporary file in the destination directory, flushed,
+synced, and closed before being published atomically using a hard link
+(`os.link`). Publication fails if the output path already exists, including a
+symbolic link. The source CSV and existing reports are never overwritten, and
+temporary-file cleanup is attempted on both success and failure.
+
+The filesystem must support hard links; there is no unsafe fallback. These
+protections cover normal runtime errors, not power loss, forced termination, or
+concurrent directory/permission changes that prevent cleanup. Cleanup errors are
+reported; if cleanup fails after publication, the completed report may already
+exist.
+
+### Spreadsheet formula protection
+
+Product and category values receive a leading apostrophe (`'`) when their first
+significant character is `=`, `+`, `-`, or `@`. Detection skips leading whitespace
+and Unicode control/format characters. Values that begin with a control/format
+character also receive the prefix. This protection applies to category summary
+rows too; grouping uses the original category names. Ordinary text is preserved,
+and numeric columns do not receive apostrophes.
+
+CSV does not store cell types, so behavior depends on the spreadsheet application
+and import settings. The apostrophe may be visible, and removing it or saving and
+importing the CSV again may remove protection. For untrusted files, explicitly
+import product and category columns as text and retain the prefix. Protection is
+not guaranteed across every spreadsheet application or CSV transformation.
+
+## Resource limits
+
+- **Input size:** up to 10 MB (10,000,000 bytes), including BOM and line endings.
+  The limit is checked against bytes actually read, not just file metadata.
+- **Sales records:** up to 100,000, excluding the header. A multiline field belongs
+  to one record; blank lines outside fields do not count as records.
+- **Field size:** the standard CSV parser's limit also applies, typically 131,072
+  characters per field. Exceeding it produces a CLI error.
+
+The exact size and record boundaries are allowed. Exceeding either limit fails
+without creating a report. All data is held in memory.
+
+## Tests
+
+Run from the repository root:
+
+```sh
+python3 -B -m unittest discover -s tests -v
+```
+
+**47 automated tests pass**, covering validation, exact monetary calculations,
+category and overall totals, CLI behavior, resource limits, formula protection,
+and file-saving failures. Tests create temporary files inside the project
+directory and remove them afterward.
